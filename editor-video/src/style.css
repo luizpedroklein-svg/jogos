@@ -163,9 +163,21 @@ progress { width: 100%; height: 12px; accent-color: var(--accent); }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 1000px) {
-  body { overflow: auto; grid-template-rows: auto auto auto; }
-  .layout { grid-template-columns: 1fr; }
-  .panel.left, .panel.right { border: 0; border-top: 1px solid var(--line); max-height: none; }
-  .stage { order: -1; height: 56vh; }
-  .timeline-area { height: 220px; }
+  body { display: flex; flex-direction: column; overflow-x: hidden; overflow-y: auto; height: auto; min-height: 100%; }
+  .layout { display: contents; }
+  .topbar { order: 0; flex-wrap: wrap; padding: 8px 12px; }
+  .brand .muted { display: none; }
+  .top-actions { gap: 6px; }
+  .top-actions button { padding: 6px 10px; }
+  .stage { order: 1; padding: 8px 12px; }
+  .canvas-wrap { flex: none; }
+  #preview { width: 100%; height: auto; max-height: 60vh; object-fit: contain; }
+  .timeline-area { order: 2; height: 200px; flex: none; }
+  .timeline { grid-template-columns: 64px 1fr; }
+  .track-labels .label { padding-left: 6px; font-size: 11px; }
+  .panel.left { order: 3; }
+  .panel.right { order: 4; }
+  .panel.left, .panel.right { border: 0; border-top: 1px solid var(--line); overflow: visible; padding: 12px; }
+  .tl-item, .ruler { touch-action: none; }
+  .tl-item .handle { width: 14px; }
 }

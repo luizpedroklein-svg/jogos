@@ -61,6 +61,7 @@ function seeded(i) {
 
 function drawSceneBackground(ctx, sc, t, W, H) {
   const { bg1, bg2, style } = sc;
+  const A = ctx.globalAlpha; // opacidade da transição
   if (sc.mediaId) {
     const m = getMedia(sc.mediaId);
     if (m && m.el) {
@@ -93,7 +94,7 @@ function drawSceneBackground(ctx, sc, t, W, H) {
       const x = (seeded(i) * W + t * 20 * (0.5 + seeded(i + 9))) % W;
       const y = (seeded(i + 3) * H - t * 30 * (0.3 + seeded(i + 5)) + H * 10) % H;
       const r = 1 + seeded(i + 7) * 3;
-      ctx.globalAlpha = 0.3 + 0.5 * Math.abs(Math.sin(t * 2 + i));
+      ctx.globalAlpha = A * (0.3 + 0.5 * Math.abs(Math.sin(t * 2 + i)));
       ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
     }
   } else if (style === "bokeh") {
@@ -109,7 +110,7 @@ function drawSceneBackground(ctx, sc, t, W, H) {
     }
   } else if (style === "ondas") {
     for (let k = 0; k < 4; k++) {
-      ctx.globalAlpha = 0.12 + k * 0.05;
+      ctx.globalAlpha = A * (0.12 + k * 0.05);
       ctx.fillStyle = "#ffffff";
       ctx.beginPath();
       const base = H * (0.6 + k * 0.1);
@@ -120,14 +121,14 @@ function drawSceneBackground(ctx, sc, t, W, H) {
       ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
     }
   } else if (style === "listras") {
-    ctx.globalAlpha = 0.1;
+    ctx.globalAlpha = A * (0.1);
     ctx.fillStyle = "#fff";
     ctx.translate(W / 2, H / 2);
     ctx.rotate(-0.5);
     const off = (t * 60) % 80;
     for (let x = -R * 1.5; x < R * 1.5; x += 80) ctx.fillRect(x + off, -R * 1.5, 30, R * 3);
   } else if (style === "neon") {
-    ctx.globalAlpha = 0.6;
+    ctx.globalAlpha = A * (0.6);
     ctx.strokeStyle = bg2;
     ctx.lineWidth = 3;
     ctx.shadowColor = bg2; ctx.shadowBlur = 25;
@@ -149,13 +150,14 @@ function drawSceneText(ctx, sc, t, dur, W, H) {
   const minD = Math.min(W, H);
   const p = ease(t / 0.8);
   const out = dur - t < 0.4 ? clamp((dur - t) / 0.4, 0, 1) : 1;
+  const A = ctx.globalAlpha;
   ctx.save();
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillStyle = sc.textColor || "#fff";
   ctx.shadowColor = "rgba(0,0,0,0.45)";
   ctx.shadowBlur = 18;
-  ctx.globalAlpha = (sc.anim === "nenhuma" ? 1 : p) * out;
+  ctx.globalAlpha = A * (sc.anim === "nenhuma" ? 1 : p) * out;
 
   let dy = 0, scale = 1;
   if (sc.anim === "subir") dy = (1 - p) * minD * 0.08;

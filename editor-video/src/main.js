@@ -1021,7 +1021,7 @@ window.addEventListener("resize", renderTimeline);
 // Início: projeto de boas-vindas
 // ---------------------------------------------------------------------------
 state.clips = [
-  makeSceneClip({ title: "Bem-vindo ao Estúdio IA", subtitle: "Edite vídeos ou crie do zero com inteligência artificial", emoji: "🎬", bg1: "#7c5cff", bg2: "#22d3ee", style: "particulas", anim: "subir", duration: 4 }),
+  makeSceneClip({ title: "Bem-vindo ao Estúdio IA", subtitle: "Edite vídeos ou crie do zero com inteligência artificial", emoji: "🎬", bg1: "#7c5cff", bg2: "#22d3ee", style: "particulas", anim: "subir", duration: 4, transition: "none" }),
   makeSceneClip({ title: "Arraste seus vídeos", subtitle: "ou use ✨ Criar com IA à esquerda", emoji: "✨", bg1: "#f43f5e", bg2: "#f59e0b", style: "bokeh", anim: "zoom", duration: 4 }),
 ];
 updateAIBadge();
@@ -1029,3 +1029,4 @@ initPlayer($("#preview"), updatePlayhead);
 renderMedia();
 renderTimeline();
 renderProps();
+seek(1.2); // mostra um quadro com o título já visível
