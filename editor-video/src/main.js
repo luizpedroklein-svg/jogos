@@ -4,7 +4,7 @@ import {
 } from "./state.js";
 import { initPlayer, play, pause, seek, resize, requestRender, exportVideo, cancelExport, snapshot, setNarration } from "./player.js";
 import {
-  getApiKey, getModel, saveSettings, hasAI, generateStoryboard, offlineStoryboard,
+  getApiKey, getModel, saveSettings, hasAI, aiMode, initAI, generateStoryboard, offlineStoryboard,
   assistantCommand, offlineCommand,
 } from "./ai.js";
 
@@ -912,11 +912,23 @@ async function doExport() {
       prog.value = p;
       msg.textContent = `${Math.round(p * 100)}% · ${fmtTime(state.currentTime)} / ${fmtTime(totalDuration())}`;
     });
-    const a = el("a", { href: URL.createObjectURL(blob), download: `estudio-ia-${Date.now()}.${ext}` });
+    const filename = `estudio-ia-${Date.now()}.${ext}`;
+    dlg.close();
+    const downloads = await downloadsCap;
+    if (downloads) {
+      // dentro do Claude, downloads diretos são bloqueados: o app pede para salvar
+      try {
+        await downloads.save({ filename, data: blob });
+        toast(`Vídeo salvo (${ext.toUpperCase()}, ${(blob.size / 1e6).toFixed(1)} MB)`, 4000);
+      } catch (e) {
+        toast(e?.code === "declined" ? "Você cancelou o salvamento. Exporte de novo para salvar." : "Não foi possível salvar o vídeo aqui.", 5000);
+      }
+      return;
+    }
+    const a = el("a", { href: URL.createObjectURL(blob), download: filename });
     document.body.append(a);
     a.click();
     a.remove();
-    dlg.close();
     toast(`Vídeo exportado (${ext.toUpperCase()}, ${(blob.size / 1e6).toFixed(1)} MB)`, 4000);
   } catch (e) {
     dlg.close();
@@ -979,14 +991,28 @@ $("#aspect").onchange = (e) => {
   resize();
 };
 
+let newArmed = 0;
 $("#btn-new").onclick = () => {
-  if (!confirm("Começar um projeto novo? A timeline atual será apagada (dá para desfazer com Ctrl+Z).")) return;
+  // confirmação dentro da página (confirm() não funciona quando publicado no Claude)
+  if (Date.now() - newArmed > 3000) {
+    newArmed = Date.now();
+    $("#btn-new").textContent = "Apagar tudo?";
+    toast("Toque em \"Apagar tudo?\" de novo para começar um projeto novo. Dá para desfazer.");
+    setTimeout(() => ($("#btn-new").textContent = "Novo"), 3000);
+    return;
+  }
+  newArmed = 0;
+  $("#btn-new").textContent = "Novo";
   mutate(() => { state.clips = []; state.texts = []; state.audio = null; state.selected = null; });
   seek(0);
 };
 
 const settings = $("#settings");
 $("#btn-settings").onclick = () => {
+  if (aiMode() === "claude") {
+    toast("A IA usa o Claude pela sua própria conta. Não precisa de chave.", 4000);
+    return;
+  }
   $("#api-key").value = getApiKey();
   $("#api-model").value = getModel();
   settings.showModal();
@@ -999,7 +1025,9 @@ settings.addEventListener("close", () => {
   }
 });
 function updateAIBadge() {
-  $("#btn-settings").textContent = hasAI() ? "⚙️ IA ✅" : "⚙️ IA (configurar)";
+  const mode = aiMode();
+  $("#btn-settings").textContent = mode === "offline" ? "⚙️ IA (configurar)" : "⚙️ IA ✅";
+  $("#btn-settings").title = mode === "claude" ? "Usando o Claude pela sua conta" : "Chave da API e modelo";
 }
 
 window.addEventListener("keydown", (e) => {
@@ -1024,7 +1052,11 @@ state.clips = [
   makeSceneClip({ title: "Bem-vindo ao Estúdio IA", subtitle: "Edite vídeos ou crie do zero com inteligência artificial", emoji: "🎬", bg1: "#7c5cff", bg2: "#22d3ee", style: "particulas", anim: "subir", duration: 4, transition: "none" }),
   makeSceneClip({ title: "Arraste seus vídeos", subtitle: "ou use ✨ Criar com IA à esquerda", emoji: "✨", bg1: "#f43f5e", bg2: "#f59e0b", style: "bokeh", anim: "zoom", duration: 4 }),
 ];
+const downloadsCap = (async () => {
+  try { return window.claude?.use ? await window.claude.use("downloads") : null; } catch { return null; }
+})();
 updateAIBadge();
+initAI().then(updateAIBadge);
 initPlayer($("#preview"), updatePlayhead);
 renderMedia();
 renderTimeline();

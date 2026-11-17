@@ -20,7 +20,53 @@ export function saveSettings(key, model) {
   store.set(KEY_STORAGE, key.trim());
   store.set(MODEL_STORAGE, model);
 }
-export const hasAI = () => !!getApiKey();
+// Quando a página roda dentro do Claude (artifact), usa a conta do próprio usuário,
+// sem precisar de chave. Fora dele, `window.claude` não existe e isso resolve null.
+let sampleFn = null;
+export async function initAI() {
+  try {
+    sampleFn = window.claude?.use ? await window.claude.use("sample") : null;
+  } catch {
+    sampleFn = null;
+  }
+  return aiMode();
+}
+/** "claude" (conta do usuário no app Claude), "key" (chave da API) ou "offline". */
+export const aiMode = () => (sampleFn ? "claude" : getApiKey() ? "key" : "offline");
+export const hasAI = () => aiMode() !== "offline";
+
+const SAMPLE_ERRORS = {
+  not_granted: "Você não permitiu que esta página use o Claude. Recarregue a página para permitir.",
+  sampling_disabled: "O Claude não está disponível para esta conta.",
+  rate_limited: "Muitos pedidos seguidos. Espere um pouco e tente de novo.",
+  session_expired: "Sua sessão expirou. Entre de novo no Claude.",
+  refused: "O Claude recusou este pedido. Tente reformular.",
+  invalid_json: "A resposta veio num formato inesperado. Tente de novo.",
+  empty_completion: "O Claude não respondeu nada. Tente pedir de outro jeito.",
+  prompt_too_large: "O projeto ficou grande demais para enviar. Tente simplificar.",
+  cancelled: "cancelado",
+};
+
+async function sampleJSON({ system, text, schema, imageB64 }) {
+  const prompt =
+    `${system}\n\n${text}\n\n` +
+    `Responda SOMENTE com um objeto JSON válido (sem texto antes ou depois) que siga este JSON Schema:\n${JSON.stringify(schema)}`;
+  const opts = { modelTier: "default", cache: false };
+  if (imageB64) {
+    const limits = await sampleFn.limits().catch(() => null);
+    if (limits?.images) {
+      const bin = atob(imageB64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      opts.images = [new Blob([bytes], { type: "image/jpeg" })];
+    }
+  }
+  try {
+    return await sampleFn.json(prompt, opts);
+  } catch (e) {
+    throw new Error(SAMPLE_ERRORS[e?.code] || "Falha ao falar com o Claude. Tente de novo.");
+  }
+}
 
 function client() {
   return new Anthropic({ apiKey: getApiKey(), dangerouslyAllowBrowser: true, maxRetries: 2 });
@@ -37,7 +83,11 @@ function extractJSON(text) {
  * Chamada ao Claude que devolve JSON validado por esquema (structured outputs).
  * Se o esquema for recusado pela API, repete pedindo JSON no prompt.
  */
-async function callJSON({ system, content, schema, maxTokens = 16000 }) {
+async function callJSON({ system, text, imageB64 = null, schema, maxTokens = 16000 }) {
+  if (sampleFn) return sampleJSON({ system, text, schema, imageB64 });
+  const content = imageB64
+    ? [{ type: "image", source: { type: "base64", media_type: "image/jpeg", data: imageB64 } }, { type: "text", text }]
+    : text;
   const api = client();
   const model = getModel();
   const base = {
@@ -70,8 +120,8 @@ async function callJSON({ system, content, schema, maxTokens = 16000 }) {
   if (res.stop_reason === "max_tokens") {
     throw new Error("A resposta ficou longa demais. Tente um vídeo mais curto.");
   }
-  const text = res.content.filter((b) => b.type === "text").map((b) => b.text).join("");
-  return extractJSON(text);
+  const reply = res.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+  return extractJSON(reply);
 }
 
 function friendlyError(err) {
@@ -135,7 +185,7 @@ export async function generateStoryboard({ prompt, duration, style, aspect, medi
     `a narração de cada cena deve caber na duração dela, ~2,5 palavras por segundo).\n` +
     `Estilo visual: ${style}\nFormato: ${aspect}\n` +
     `Mídias do usuário disponíveis para fundos:\n${mediaList}`;
-  const data = await callJSON({ system, content: user, schema: storyboardSchema });
+  const data = await callJSON({ system, text: user, schema: storyboardSchema });
   return normalizeStoryboard(data);
 }
 
@@ -285,15 +335,8 @@ export async function assistantCommand({ command, project, imageB64, history }) 
   const ctx = history.length
     ? `Conversa recente:\n${history.map((h) => `${h.role === "user" ? "Usuário" : "Assistente"}: ${h.text}`).join("\n")}\n\n`
     : "";
-  const content = [];
-  if (imageB64) {
-    content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: imageB64 } });
-  }
-  content.push({
-    type: "text",
-    text: `${ctx}Estado do projeto:\n${JSON.stringify(project, null, 1)}\n\nPedido: ${command}`,
-  });
-  return callJSON({ system, content, schema: opsSchema, maxTokens: 8000 });
+  const text = `${ctx}Estado do projeto:\n${JSON.stringify(project, null, 1)}\n\nPedido: ${command}`;
+  return callJSON({ system, text, imageB64, schema: opsSchema, maxTokens: 8000 });
 }
 
 /** Interpretação simples de comandos quando não há chave de API. */

@@ -13,6 +13,15 @@ npm run build    # gera a versão estática em dist/
 
 Use Chrome ou Edge (recomendados), ou Firefox.
 
+Para gerar o app inteiro num único arquivo HTML (bom para abrir no celular ou publicar como página no Claude):
+
+```bash
+npm run build:single   # gera dist-single/estudio-ia.html
+```
+
+Quando essa página roda dentro do Claude (como artifact), a IA usa a conta Claude de quem está usando,
+sem precisar de chave, e o vídeo exportado é salvo pelo próprio app do Claude.
+
 ## O que dá para fazer
 
 **Editor**
