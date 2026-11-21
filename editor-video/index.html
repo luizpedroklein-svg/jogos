@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Estúdio IA</title>
+  <link rel="stylesheet" href="./src/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">🎬 <strong>Estúdio IA</strong><span class="muted">editor e criador de vídeos</span></div>
+    <div class="top-actions">
+      <label class="inline">Formato
+        <select id="aspect">
+          <option value="16:9">16:9 (YouTube)</option>
+          <option value="9:16">9:16 (Reels/TikTok)</option>
+          <option value="1:1">1:1 (Feed)</option>
+        </select>
+      </label>
+      <button id="btn-new" class="ghost" title="Novo projeto">Novo</button>
+      <button id="btn-settings" class="ghost" title="Chave da API e modelo">⚙️ IA</button>
+      <button id="btn-export" class="primary">⬇️ Exportar vídeo</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- Painel esquerdo: mídia + IA -->
+    <aside class="panel left">
+      <nav class="tabs" data-tabs="left">
+        <button data-tab="tab-media" class="active">Mídia</button>
+        <button data-tab="tab-create">✨ Criar com IA</button>
+        <button data-tab="tab-assistant">🤖 Assistente</button>
+      </nav>
+
+      <section id="tab-media" class="tab active">
+        <label class="dropzone" id="dropzone">
+          <input type="file" id="file-input" multiple accept="video/*,image/*,audio/*" hidden />
+          <span>Arraste vídeos, imagens ou músicas aqui<br /><small>ou clique para escolher</small></span>
+        </label>
+        <div id="media-list" class="media-list"></div>
+        <div class="row gap">
+          <button id="btn-add-text">＋ Texto</button>
+          <button id="btn-add-scene">＋ Cena colorida</button>
+        </div>
+      </section>
+
+      <section id="tab-create" class="tab">
+        <p class="muted small">Descreva o vídeo e a IA cria o roteiro, as cenas animadas, as legendas e a narração.</p>
+        <textarea id="create-prompt" rows="5" placeholder="Ex.: Um vídeo motivacional de 30 segundos sobre começar a estudar programação, tom animado, para Reels"></textarea>
+        <div class="grid2">
+          <label>Duração (s)<input type="number" id="create-duration" min="5" max="180" value="30" /></label>
+          <label>Estilo
+            <select id="create-style">
+              <option value="moderno">Moderno</option>
+              <option value="minimalista">Minimalista</option>
+              <option value="neon">Neon</option>
+              <option value="natureza">Natureza</option>
+              <option value="corporativo">Corporativo</option>
+              <option value="divertido">Divertido</option>
+            </select>
+          </label>
+        </div>
+        <label class="check"><input type="checkbox" id="create-captions" checked /> Adicionar legendas da narração</label>
+        <label class="check"><input type="checkbox" id="create-replace" checked /> Substituir a timeline atual</label>
+        <label class="check"><input type="checkbox" id="create-use-media" /> Usar minhas mídias importadas nas cenas</label>
+        <button id="btn-create" class="primary wide">✨ Gerar vídeo</button>
+        <div id="create-status" class="status"></div>
+        <details id="script-box" class="script-box" hidden>
+          <summary>Roteiro gerado</summary>
+          <div id="script-content"></div>
+        </details>
+      </section>
+
+      <section id="tab-assistant" class="tab">
+        <p class="muted small">Peça edições em linguagem natural. Ex.: <em>"deixa o segundo clipe em preto e branco"</em>, <em>"coloca um título 'Minha viagem' nos 3 primeiros segundos"</em>, <em>"acelera tudo 1.5x"</em>.</p>
+        <div id="chat" class="chat"></div>
+        <label class="check"><input type="checkbox" id="assist-frame" checked /> Enviar quadro atual para a IA ver</label>
+        <div class="row gap">
+          <textarea id="assist-input" rows="2" placeholder="O que você quer mudar?"></textarea>
+          <button id="btn-assist" class="primary">Enviar</button>
+        </div>
+        <div class="row gap wrap">
+          <button class="chip" data-quick="Sugira e aplique um título de abertura chamativo e legendas curtas para este vídeo">Título + legendas</button>
+          <button class="chip" data-quick="Aplique um visual cinematográfico em todos os clipes (contraste maior, saturação levemente menor) e transições suaves">Visual cinema</button>
+          <button class="chip" data-quick="Crie título, descrição e hashtags para publicar este vídeo nas redes sociais. Não altere a timeline.">Texto p/ redes</button>
+        </div>
+      </section>
+    </aside>
+
+    <!-- Centro: preview -->
+    <section class="stage">
+      <div class="canvas-wrap" id="canvas-wrap">
+        <canvas id="preview" width="1280" height="720"></canvas>
+      </div>
+      <div class="transport">
+        <button id="btn-start" title="Início">⏮</button>
+        <button id="btn-play" class="primary round" title="Play/Pause (Espaço)">▶</button>
+        <button id="btn-split" title="Dividir clipe no cursor (S)">✂️ Dividir</button>
+        <button id="btn-delete" title="Excluir seleção (Delete)">🗑️</button>
+        <span id="time" class="time">00:00.0 / 00:00.0</span>
+        <label class="check small"><input type="checkbox" id="narrate" /> Narração por voz no preview</label>
+      </div>
+    </section>
+
+    <!-- Direita: propriedades -->
+    <aside class="panel right">
+      <h3>Propriedades</h3>
+      <div id="props" class="props"><p class="muted">Selecione um clipe ou texto na timeline.</p></div>
+    </aside>
+  </main>
+
+  <!-- Timeline -->
+  <section class="timeline-area">
+    <div class="timeline-tools">
+      <span class="muted small">Zoom</span>
+      <input type="range" id="zoom" min="10" max="200" value="60" />
+      <span class="muted small" id="tl-info"></span>
+    </div>
+    <div class="timeline" id="timeline">
+      <div class="track-labels">
+        <div class="ruler-label"></div>
+        <div class="label">🎞️ Vídeo</div>
+        <div class="label">🔤 Texto</div>
+        <div class="label">🎵 Áudio</div>
+      </div>
+      <div class="tracks-scroll" id="tracks-scroll">
+        <div class="tracks" id="tracks">
+          <div class="ruler" id="ruler"></div>
+          <div class="track" id="track-video"></div>
+          <div class="track" id="track-text"></div>
+          <div class="track" id="track-audio"></div>
+          <div class="playhead" id="playhead"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Modal configurações -->
+  <dialog id="settings">
+    <form method="dialog" class="modal">
+      <h3>Configurar IA (Claude)</h3>
+      <p class="small muted">A chave fica salva só neste navegador (localStorage) e é enviada direto para a API da Anthropic. Sem chave, o criador usa um gerador simples offline.</p>
+      <label>Chave da API Anthropic<input type="password" id="api-key" placeholder="sk-ant-..." autocomplete="off" /></label>
+      <label>Modelo
+        <select id="api-model">
+          <option value="claude-opus-5-5">Claude Opus 5.5 (melhor qualidade)</option>
+          <option value="claude-sonnet-5-5">Claude Sonnet 5.5 (rápido)</option>
+          <option value="claude-haiku-5-5">Claude Haiku 5.5 (mais barato)</option>
+        </select>
+      </label>
+      <div class="row gap end">
+        <button value="cancel" class="ghost">Cancelar</button>
+        <button id="btn-save-settings" value="save" class="primary">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modal exportação -->
+  <dialog id="export-dlg">
+    <div class="modal">
+      <h3>Exportando vídeo…</h3>
+      <p class="small muted">A exportação acontece em tempo real enquanto o vídeo toca. Mantenha esta aba aberta.</p>
+      <progress id="export-progress" max="1" value="0"></progress>
+      <p id="export-msg" class="small"></p>
+      <div class="row gap end"><button id="btn-export-cancel" class="ghost">Cancelar</button></div>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast"></div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
